@@ -16,10 +16,11 @@ cap = cv2.VideoCapture(0)
 frame = None
 running = True
 
-# Flags to store detection results
+# Flags to store detection results and a lock for synchronization
 left_area_clear = True
 right_area_clear = True
 forward_area_clear = True
+lock = threading.Lock()
 
 # Thread to capture frames
 def capture_thread():
@@ -37,63 +38,64 @@ def detection_thread():
         if frame is None:
             continue
         
-        frame_height, frame_width, _ = frame.shape
+        # Lock access to the frame and flags
+        with lock:
+            frame_height, frame_width, _ = frame.shape
 
-        # Define the central rectangle (adjust as needed)
-        center_x_min, center_x_max = int(frame_width * 0.3), int(frame_width * 0.7)
-        center_y_min, center_y_max = int(frame_height * 0.1), int(frame_height * 0.9)
+            # Define the central rectangle (adjust as needed)
+            center_x_min, center_x_max = int(frame_width * 0.3), int(frame_width * 0.7)
+            center_y_min, center_y_max = int(frame_height * 0.1), int(frame_height * 0.9)
 
-        # Detect objects using YOLO
-        blob = cv2.dnn.blobFromImage(frame, 0.00392, (416, 416), (0, 0, 0), True, crop=False)
-        net.setInput(blob)
-        outs = net.forward(output_layers)
+            # Detect objects using YOLO
+            blob = cv2.dnn.blobFromImage(frame, 0.00392, (416, 416), (0, 0, 0), True, crop=False)
+            net.setInput(blob)
+            outs = net.forward(output_layers)
 
-        # Reset area flags for each frame
-        left_area_clear = True
-        right_area_clear = True
-        forward_area_clear = True
+            # Reset area flags for each frame
+            left_area_clear = True
+            right_area_clear = True
+            forward_area_clear = True
 
-        # Check for objects in the frame
-        for out in outs:
-            for detection in out:
-                scores = detection[5:]
-                class_id = np.argmax(scores)
-                confidence = scores[class_id]
+            # Check for objects in the frame
+            for out in outs:
+                for detection in out:
+                    scores = detection[5:]
+                    class_id = np.argmax(scores)
+                    confidence = scores[class_id]
 
-                # Filter only high confidence detections
-                if confidence > 0.5:
-                    center_x = int(detection[0] * frame_width)
-                    center_y = int(detection[1] * frame_height)
-                    w = int(detection[2] * frame_width)
-                    h = int(detection[3] * frame_height)
-                    
-                    x = int(center_x - w / 2)
-                    y = int(center_y - h / 2)
+                    # Filter only high confidence detections
+                    if confidence > 0.5:
+                        center_x = int(detection[0] * frame_width)
+                        center_y = int(detection[1] * frame_height)
+                        w = int(detection[2] * frame_width)
+                        h = int(detection[3] * frame_height)
+                        
+                        # Check if the object is within the central detection area
+                        if center_x_min < center_x < center_x_max and center_y_min < center_y < center_y_max:
+                            forward_area_clear = False  # Obstruction in the forward area
 
-                    # Check if the object is within the central detection area
-                    if center_x_min < center_x < center_x_max and center_y_min < center_y < center_y_max:
-                        forward_area_clear = False  # Obstruction in the forward area
-
-                    # Determine if the left or right areas are clear
-                    if center_x < (center_x_min + center_x_max) // 2:
-                        left_area_clear = False
-                    else:
-                        right_area_clear = False
+                        # Determine if the left or right areas are clear
+                        if center_x < (center_x_min + center_x_max) // 2:
+                            left_area_clear = False
+                        else:
+                            right_area_clear = False
 
 # Thread to display directions based on detection
 def display_thread():
     global running
     while running:
-        if forward_area_clear:
-            print("forward")
-        elif left_area_clear and not right_area_clear:
-            print("left")
-        elif right_area_clear and not left_area_clear:
-            print("right")
-        elif left_area_clear and right_area_clear:
-            print("left")
-        else:
-            print("no path")
+        # Lock access to the flags
+        with lock:
+            if forward_area_clear:
+                print("forward")
+            elif left_area_clear and not right_area_clear:
+                print("left")
+            elif right_area_clear and not left_area_clear:
+                print("right")
+            elif left_area_clear and right_area_clear:
+                print("left")
+            else:
+                print("no path")
 
 # Start threads
 capture = threading.Thread(target=capture_thread)
