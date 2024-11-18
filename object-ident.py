@@ -5,24 +5,16 @@ import time
 # Initialize GPIO
 GPIO.setmode(GPIO.BCM)
 GPIO.setup(17, GPIO.OUT)
+GPIO.setup(27, GPIO.OUT)
 
 left = False
+right = False
 
-def toggleLeft(value=None, val=False):
-    left = val
-    if value == None:
-        left = not left
-        if left:
-            GPIO.output(17, GPIO.HIGH)
-        else:
-            GPIO.output(17, GPIO.LOW)
-    else:
-        left = value
-        if left:
-            GPIO.output(17, GPIO.HIGH)
-        else:
-            GPIO.output(17, GPIO.LOW)
-    return left
+def togglePin(pin, value):
+    val = GPIO.LOW
+    if value: val = GPIO.HIGH
+    GPIO.output(pin, val)
+ 
         
 
 # List of objects considered as obstructions
@@ -128,17 +120,22 @@ if __name__ == "__main__":
         if object_in_center:
             if left_area_clear and not right_area_clear:
                 cv2.putText(img, "Move LEFT", (50, 50), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
-                left = toggleLeft(val = left)
+                togglePin(27, False)
+                togglePin(17, True)
             elif right_area_clear and not left_area_clear:
                 cv2.putText(img, "Move RIGHT", (50, 50), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
+                togglePin(17, False)
+                togglePin(27, True)
             elif left_area_clear and right_area_clear:
                 cv2.putText(img, "Move LEFT", (50, 50), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
-                eft = toggleLeft(val = left)
+                togglePin(17, True)
+                togglePin(27, True)
             else:
                 cv2.putText(img, "No Clear Path", (50, 50), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
         else:
             cv2.putText(img, "Move FORWARD", (50, 50), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
-            left = toggleLeft(False, left)
+            togglePin(17, False)
+            togglePin(27, False)
 
         # Display the output
         cv2.imshow("Output", img)
